@@ -1,30 +1,23 @@
-# Netlify Configuration for MarketSauce Agent
-# IMPORTANT: Clear any build settings in Netlify Dashboard -> Site Settings -> Build & Deploy
-
 [build]
-  # Base directory (root of repo)
   base = ""
-
-  # Build command - runs from base directory
   command = "cd frontend && npm install && npm run build"
-
-  # Publish directory - relative to base
   publish = "frontend/dist"
+  functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "18"
-  NPM_FLAGS = "--legacy-peer-deps"
 
-# SPA routing - CRITICAL for React apps
+[functions]
+  node_bundler = "esbuild"
+
+# API routes go to functions
+[[redirects]]
+  from = "/api/diagnostic"
+  to = "/.netlify/functions/diagnostic"
+  status = 200
+
+# SPA routing for everything else
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-  force = true
-
-# Security headers
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Frame-Options = "DENY"
-    X-Content-Type-Options = "nosniff"

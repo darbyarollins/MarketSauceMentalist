@@ -14,22 +14,7 @@ const colors = {
 // API Configuration
 const API_BASE = '/api';
 
-// Check if we're in demo mode (no backend available)
-const checkBackendAvailable = async () => {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
-
-    const response = await fetch('/health', {
-      signal: controller.signal,
-      method: 'GET'
-    });
-    clearTimeout(timeoutId);
-    return response.ok;
-  } catch (error) {
-    return false;
-  }
-};
+// No demo mode check needed - Firecrawl function handles everything
 
 // Toast Notification Component
 const Toast = ({ message, type, onClose }) => {
@@ -94,7 +79,7 @@ const DemoModeBanner = () => (
 );
 
 // Intake Form Component
-const IntakeForm = ({ onSubmit, isProcessing, isDemoMode }) => {
+const IntakeForm = ({ onSubmit, isProcessing }) => {
   const [formData, setFormData] = useState({
     businessName: '',
     websiteUrl: '',
@@ -137,17 +122,6 @@ const IntakeForm = ({ onSubmit, isProcessing, isDemoMode }) => {
 
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {isDemoMode && (
-        <div style={{
-          padding: '12px 16px',
-          backgroundColor: colors.lightGray,
-          fontSize: '13px',
-          lineHeight: '1.5',
-          color: colors.darkGray
-        }}>
-          You are in demo mode. Fill in your details to see a sample diagnostic output.
-        </div>
-      )}
 
       <div>
         <label style={labelStyle}>Business Name *</label>
@@ -255,14 +229,14 @@ const IntakeForm = ({ onSubmit, isProcessing, isDemoMode }) => {
           transition: 'transform 0.2s, box-shadow 0.2s'
         }}
       >
-        {isProcessing ? 'Processing...' : isDemoMode ? 'Generate Demo Diagnostic' : 'Generate Diagnostic'}
+        {isProcessing ? 'Researching...' : 'Generate Research'}
       </button>
     </form>
   );
 };
 
 // Progress Tracker Component
-const ProgressTracker = ({ currentPhase, phases, phaseName, isDemoMode }) => {
+const ProgressTracker = ({ currentPhase, phases, phaseName }) => {
   return (
     <div style={{ padding: '24px', backgroundColor: colors.darkGray, color: colors.white }}>
       <h3 style={{
@@ -272,7 +246,7 @@ const ProgressTracker = ({ currentPhase, phases, phaseName, isDemoMode }) => {
         marginBottom: '20px',
         color: colors.lime
       }}>
-        {isDemoMode ? 'Demo Mode - ' : ''}Processing: {phaseName}
+        Researching: {phaseName}
       </h3>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -386,18 +360,15 @@ const OutputSection = ({ title, content, isExpanded, onToggle }) => {
 };
 
 // Chat Interface Component
-const ChatInterface = ({ diagnosticContext, sessionId, onSessionCreate, isDemoMode }) => {
+const ChatInterface = ({ diagnosticContext }) => {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: isDemoMode
-        ? 'Demo Mode: Your MarketSauce diagnostic is complete. This is a simulated chat - responses are pre-generated examples. In the full version, you would get AI-powered strategic guidance.'
-        : 'Your MarketSauce diagnostic is complete. I have deep context on your market, persona, and competitive landscape. Ask me anything to refine your strategy, develop campaigns, or generate content.'
+      content: 'Your research is complete! Review the findings above. Chat feature coming soon with AI integration.'
     }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [chatSessionId, setChatSessionId] = useState(sessionId);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -419,59 +390,16 @@ const ChatInterface = ({ diagnosticContext, sessionId, onSessionCreate, isDemoMo
 
   const handleSend = async () => {
     if (!input.trim()) return;
-
-    const userMessage = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMessage]);
-    const currentInput = input;
+    setMessages(prev => [...prev, { role: 'user', content: input }]);
     setInput('');
     setIsLoading(true);
 
-    // If in demo mode, skip API call entirely
-    if (isDemoMode) {
-      await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 700));
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: demoResponses[Math.floor(Math.random() * demoResponses.length)]
-      }]);
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-      const response = await fetch(`${API_BASE}/chat/message`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session_id: chatSessionId || 'new',
-          message: currentInput,
-          diagnostic_context: diagnosticContext
-        }),
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        const data = await response.json();
-        if (!chatSessionId) {
-          setChatSessionId(data.session_id);
-          onSessionCreate?.(data.session_id);
-        }
-        setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
-      } else {
-        throw new Error('Chat request failed');
-      }
-    } catch (error) {
-      // Fallback response
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: demoResponses[Math.floor(Math.random() * demoResponses.length)]
-      }]);
-    }
-
+    // Simple response - chat feature coming soon
+    await new Promise(resolve => setTimeout(resolve, 500));
+    setMessages(prev => [...prev, {
+      role: 'assistant',
+      content: 'Chat feature coming soon! For now, review the research report above and download it for your records.'
+    }]);
     setIsLoading(false);
   };
 
@@ -495,7 +423,7 @@ const ChatInterface = ({ diagnosticContext, sessionId, onSessionCreate, isDemoMo
           letterSpacing: '0.1em',
           margin: 0
         }}>
-          Strategy Chat {isDemoMode && '(Demo)'}
+          Strategy Chat
         </h3>
       </div>
 
@@ -578,7 +506,7 @@ const ChatInterface = ({ diagnosticContext, sessionId, onSessionCreate, isDemoMo
 };
 
 // Pricing Card Component
-const PricingCard = ({ tier, price, period, features, isPopular, onSelect, isDemoMode }) => {
+const PricingCard = ({ tier, price, period, features, isPopular, onSelect }) => {
   return (
     <div style={{
       border: isPopular ? `3px solid ${colors.lime}` : `2px solid ${colors.darkGray}`,
@@ -653,7 +581,7 @@ const PricingCard = ({ tier, price, period, features, isPopular, onSelect, isDem
           cursor: 'pointer'
         }}
       >
-        {isDemoMode ? 'Try Demo' : 'Get Started'}
+        Get Started
       </button>
     </div>
   );
@@ -668,8 +596,7 @@ const App = () => {
   const [jobId, setJobId] = useState(null);
   const [expandedSections, setExpandedSections] = useState({ executive: true });
   const [selectedTier, setSelectedTier] = useState('strategic');
-  const [isDemoMode, setIsDemoMode] = useState(true);
-  const [isCheckingBackend, setIsCheckingBackend] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
   const phases = [
@@ -683,23 +610,6 @@ const App = () => {
     'Compiling final report'
   ];
 
-  // Check backend availability on mount
-  useEffect(() => {
-    const checkBackend = async () => {
-      setIsCheckingBackend(true);
-      const available = await checkBackendAvailable();
-      setIsDemoMode(!available);
-      setIsCheckingBackend(false);
-
-      if (!available) {
-        setToast({
-          message: 'Backend not available. Running in demo mode with sample data.',
-          type: 'warning'
-        });
-      }
-    };
-    checkBackend();
-  }, []);
 
   const showToast = (message, type = 'info') => {
     setToast({ message, type });
@@ -852,22 +762,17 @@ Your market contains three main competitor types:
   const handleSubmitIntake = async (formData) => {
     setView('processing');
     setCurrentPhase(0);
-    setPhaseName('Initializing');
-
-    // If in demo mode, skip API entirely
-    if (isDemoMode) {
-      const demoData = await generateDemoDiagnostic(formData);
-      setDiagnosticData(demoData);
-      setView('results');
-      showToast('Demo diagnostic complete!', 'success');
-      return;
-    }
+    setPhaseName('Researching...');
+    setIsLoading(true);
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      // Simulate progress while waiting
+      const progressInterval = setInterval(() => {
+        setCurrentPhase(prev => Math.min(prev + 1, phases.length - 1));
+        setPhaseName(phases[Math.min(currentPhase + 1, phases.length - 1)]);
+      }, 2000);
 
-      const response = await fetch(`${API_BASE}/diagnostic/create`, {
+      const response = await fetch(`${API_BASE}/diagnostic`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -875,31 +780,32 @@ Your market contains three main competitor types:
           website_url: formData.websiteUrl,
           target_market: formData.targetMarket,
           what_they_sell: formData.whatTheySell,
-          competitors: formData.competitors || null,
-          challenges: formData.challenges || null,
-          goals: formData.goals || null,
-          context: formData.context || null,
-          mode: selectedTier === 'express' ? 'express' : selectedTier === 'prime' ? 'full' : 'strategic'
-        }),
-        signal: controller.signal
+          competitors: formData.competitors || '',
+          challenges: formData.challenges || '',
+          goals: formData.goals || ''
+        })
       });
 
-      clearTimeout(timeoutId);
+      clearInterval(progressInterval);
 
       if (response.ok) {
         const data = await response.json();
-        setJobId(data.job_id);
-        pollJobStatus(data.job_id);
+        setDiagnosticData({
+          businessName: data.inputs?.business_name || formData.businessName,
+          targetMarket: data.inputs?.target_market || formData.targetMarket,
+          diagnostic: data.diagnostic,
+          executiveSummary: data.executive_summary
+        });
+        setView('results');
+        showToast('Research complete!', 'success');
       } else {
-        throw new Error('Failed to create diagnostic');
+        throw new Error('Research failed');
       }
     } catch (error) {
-      // Fallback to demo mode
-      showToast('Could not reach server. Generating demo diagnostic...', 'warning');
-      setIsDemoMode(true);
-      const demoData = await generateDemoDiagnostic(formData);
-      setDiagnosticData(demoData);
-      setView('results');
+      showToast(`Error: ${error.message}`, 'error');
+      setView('intake');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -907,7 +813,7 @@ Your market contains three main competitor types:
     if (!diagnosticData) return;
 
     try {
-      if (type === 'report' && !isDemoMode) {
+      if (type === 'report') {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
 
@@ -968,36 +874,6 @@ Your market contains three main competitor types:
     }));
   };
 
-  // Show loading state while checking backend
-  if (isCheckingBackend) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        backgroundColor: colors.lightGray,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif"
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: '60px',
-            height: '60px',
-            backgroundColor: colors.lime,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: '700',
-            fontSize: '32px',
-            margin: '0 auto 20px'
-          }}>
-            M
-          </div>
-          <p style={{ color: colors.darkGray, fontSize: '16px' }}>Loading MarketSauce...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div style={{
@@ -1014,8 +890,6 @@ Your market contains three main competitor types:
         />
       )}
 
-      {/* Demo Mode Banner */}
-      {isDemoMode && <DemoModeBanner />}
 
       {/* Header */}
       <header style={{
@@ -1093,16 +967,6 @@ Your market contains three main competitor types:
                 Deep buyer psychology, competitive analysis, and implementation roadmaps.
                 Submit your business info. Get actionable strategy in minutes.
               </p>
-              {isDemoMode && (
-                <p style={{
-                  fontSize: '14px',
-                  color: colors.warning,
-                  marginTop: '16px',
-                  fontWeight: '600'
-                }}>
-                  Currently in demo mode - try the interface with sample data
-                </p>
-              )}
             </div>
 
             <div style={{
@@ -1123,7 +987,6 @@ Your market contains three main competitor types:
                   'Delivered in under 5 minutes'
                 ]}
                 onSelect={() => handleSelectTier('express')}
-                isDemoMode={isDemoMode}
               />
 
               <PricingCard
@@ -1141,8 +1004,7 @@ Your market contains three main competitor types:
                   'Monthly research refresh'
                 ]}
                 onSelect={() => handleSelectTier('strategic')}
-                isDemoMode={isDemoMode}
-              />
+                              />
 
               <PricingCard
                 tier="PRIME"
@@ -1158,8 +1020,7 @@ Your market contains three main competitor types:
                   'Priority processing'
                 ]}
                 onSelect={() => handleSelectTier('prime')}
-                isDemoMode={isDemoMode}
-              />
+                              />
             </div>
           </div>
         )}
@@ -1181,10 +1042,7 @@ Your market contains three main competitor types:
                 color: colors.darkGray,
                 lineHeight: '1.6'
               }}>
-                {isDemoMode
-                  ? 'Fill in your details to generate a sample diagnostic. In the full version, we research your website and competitors automatically.'
-                  : 'The more context you provide, the sharper your diagnostic. We will research your website and competitors automatically.'
-                }
+The more context you provide, the sharper your research. We will analyze your website and competitors automatically.
               </p>
             </div>
 
@@ -1193,7 +1051,7 @@ Your market contains three main competitor types:
               padding: '32px',
               border: `2px solid ${colors.darkGray}`
             }}>
-              <IntakeForm onSubmit={handleSubmitIntake} isDemoMode={isDemoMode} />
+              <IntakeForm onSubmit={handleSubmitIntake} />
             </div>
           </div>
         )}
@@ -1208,16 +1066,13 @@ Your market contains three main competitor types:
                 marginBottom: '12px',
                 color: colors.black
               }}>
-                {isDemoMode ? 'Generating Demo Diagnostic' : 'Generating Your Diagnostic'}
+                Researching Your Market
               </h2>
               <p style={{
                 fontSize: '16px',
                 color: colors.darkGray
               }}>
-                {isDemoMode
-                  ? 'Creating a sample diagnostic based on your inputs...'
-                  : 'Our AI is researching your market and building your strategic brief.'
-                }
+                Firecrawl is researching your website, competitors, and market trends...
               </p>
             </div>
 
@@ -1225,8 +1080,7 @@ Your market contains three main competitor types:
               currentPhase={currentPhase}
               phases={phases}
               phaseName={phaseName}
-              isDemoMode={isDemoMode}
-            />
+                          />
           </div>
         )}
 
@@ -1246,10 +1100,7 @@ Your market contains three main competitor types:
                 fontSize: '16px',
                 color: colors.darkGray
               }}>
-                {isDemoMode
-                  ? 'Your demo diagnostic is ready. Download the sample report or explore the strategy chat below.'
-                  : 'Your market intelligence is ready. Download the full report or continue refining your strategy below.'
-                }
+                Your market research is ready. Download the report below.
               </p>
             </div>
 
@@ -1317,7 +1168,7 @@ Your market contains three main competitor types:
                     letterSpacing: '0.1em',
                     margin: 0
                   }}>
-                    Key Findings {isDemoMode && '(Demo)'}
+                    Key Findings
                   </h3>
                 </div>
 
@@ -1347,8 +1198,7 @@ Your market contains three main competitor types:
 
               <ChatInterface
                 diagnosticContext={diagnosticData.diagnostic}
-                isDemoMode={isDemoMode}
-              />
+                              />
             </div>
           </div>
         )}
