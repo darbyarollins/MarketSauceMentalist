@@ -1,0 +1,79 @@
+# Environment files - ALL variations
+.env
+.env.*
+
+# Explicitly allow the example file
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+.venv/
+env/
+ENV/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Build outputs
+frontend/build/
+frontend/dist/
+backend/dist/
+*.bundle.js
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+coverage.xml
+*.cover
+
+# Logs
+logs/
+*.log
+
+# Generated documents (keep templates)
+output/
+generated/
+*.docx
+*.pdf
+!templates/*.docx
+
+# Local database
+*.db
+*.sqlite3
+
+# Stripe test keys (never commit)
+stripe-*.json
