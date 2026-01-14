@@ -6,14 +6,95 @@ const colors = {
   black: '#000000',
   darkGray: '#212121',
   lightGray: '#e5e0df',
-  white: '#ffffff'
+  white: '#ffffff',
+  error: '#ff4444',
+  warning: '#ffaa00'
 };
 
 // API Configuration
 const API_BASE = '/api';
 
+// Check if we're in demo mode (no backend available)
+const checkBackendAvailable = async () => {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+    const response = await fetch('/health', {
+      signal: controller.signal,
+      method: 'GET'
+    });
+    clearTimeout(timeoutId);
+    return response.ok;
+  } catch (error) {
+    return false;
+  }
+};
+
+// Toast Notification Component
+const Toast = ({ message, type, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 5000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const bgColor = type === 'error' ? colors.error :
+                  type === 'warning' ? colors.warning :
+                  colors.lime;
+  const textColor = type === 'error' ? colors.white : colors.black;
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: '20px',
+      right: '20px',
+      padding: '16px 24px',
+      backgroundColor: bgColor,
+      color: textColor,
+      fontWeight: '600',
+      fontSize: '14px',
+      zIndex: 1000,
+      maxWidth: '400px',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px'
+    }}>
+      <span style={{ flex: 1 }}>{message}</span>
+      <button
+        onClick={onClose}
+        style={{
+          background: 'none',
+          border: 'none',
+          color: textColor,
+          cursor: 'pointer',
+          fontSize: '18px',
+          padding: '0',
+          lineHeight: 1
+        }}
+      >
+        x
+      </button>
+    </div>
+  );
+};
+
+// Demo Mode Banner Component
+const DemoModeBanner = () => (
+  <div style={{
+    backgroundColor: colors.warning,
+    color: colors.black,
+    padding: '10px 20px',
+    textAlign: 'center',
+    fontSize: '14px',
+    fontWeight: '600'
+  }}>
+    Demo Mode - Running without backend API. Results are simulated examples.
+  </div>
+);
+
 // Intake Form Component
-const IntakeForm = ({ onSubmit, isProcessing }) => {
+const IntakeForm = ({ onSubmit, isProcessing, isDemoMode }) => {
   const [formData, setFormData] = useState({
     businessName: '',
     websiteUrl: '',
@@ -56,6 +137,18 @@ const IntakeForm = ({ onSubmit, isProcessing }) => {
 
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {isDemoMode && (
+        <div style={{
+          padding: '12px 16px',
+          backgroundColor: colors.lightGray,
+          fontSize: '13px',
+          lineHeight: '1.5',
+          color: colors.darkGray
+        }}>
+          You are in demo mode. Fill in your details to see a sample diagnostic output.
+        </div>
+      )}
+
       <div>
         <label style={labelStyle}>Business Name *</label>
         <input
@@ -162,14 +255,14 @@ const IntakeForm = ({ onSubmit, isProcessing }) => {
           transition: 'transform 0.2s, box-shadow 0.2s'
         }}
       >
-        {isProcessing ? 'Processing...' : 'Generate Diagnostic'}
+        {isProcessing ? 'Processing...' : isDemoMode ? 'Generate Demo Diagnostic' : 'Generate Diagnostic'}
       </button>
     </form>
   );
 };
 
 // Progress Tracker Component
-const ProgressTracker = ({ currentPhase, phases, phaseName }) => {
+const ProgressTracker = ({ currentPhase, phases, phaseName, isDemoMode }) => {
   return (
     <div style={{ padding: '24px', backgroundColor: colors.darkGray, color: colors.white }}>
       <h3 style={{
@@ -179,7 +272,7 @@ const ProgressTracker = ({ currentPhase, phases, phaseName }) => {
         marginBottom: '20px',
         color: colors.lime
       }}>
-        Processing: {phaseName}
+        {isDemoMode ? 'Demo Mode - ' : ''}Processing: {phaseName}
       </h3>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -293,11 +386,13 @@ const OutputSection = ({ title, content, isExpanded, onToggle }) => {
 };
 
 // Chat Interface Component
-const ChatInterface = ({ diagnosticContext, sessionId, onSessionCreate }) => {
+const ChatInterface = ({ diagnosticContext, sessionId, onSessionCreate, isDemoMode }) => {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: 'Your MarketSauce diagnostic is complete. I have deep context on your market, persona, and competitive landscape. Ask me anything to refine your strategy, develop campaigns, or generate content.'
+      content: isDemoMode
+        ? 'Demo Mode: Your MarketSauce diagnostic is complete. This is a simulated chat - responses are pre-generated examples. In the full version, you would get AI-powered strategic guidance.'
+        : 'Your MarketSauce diagnostic is complete. I have deep context on your market, persona, and competitive landscape. Ask me anything to refine your strategy, develop campaigns, or generate content.'
     }
   ]);
   const [input, setInput] = useState('');
@@ -313,24 +408,51 @@ const ChatInterface = ({ diagnosticContext, sessionId, onSessionCreate }) => {
     scrollToBottom();
   }, [messages]);
 
+  // Demo responses for when backend is not available
+  const demoResponses = [
+    `Based on your diagnostic, here's my recommendation: Your primary persona is struggling with clarity on their path forward. Consider creating a "quick win" resource that demonstrates your methodology in action.`,
+    `Looking at your competitive positioning, the biggest gap I see is in personalized implementation support. You could differentiate by offering a "done-with-you" service tier.`,
+    `For your target market, the emotional trigger that resonates most is the fear of wasting time on strategies that don't work. Your messaging should lead with transformation outcomes, not features.`,
+    `Your market research shows three key opportunities: 1) Community-led growth through workshops, 2) Productized services with clear outcomes, 3) Content that addresses specific pain points rather than general advice.`,
+    `The competitive analysis reveals that most players focus on theory over implementation. Position yourself as the "implementation partner" - the one who helps them actually execute, not just plan.`
+  ];
+
   const handleSend = async () => {
     if (!input.trim()) return;
 
     const userMessage = { role: 'user', content: input };
     setMessages(prev => [...prev, userMessage]);
+    const currentInput = input;
     setInput('');
     setIsLoading(true);
 
+    // If in demo mode, skip API call entirely
+    if (isDemoMode) {
+      await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 700));
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: demoResponses[Math.floor(Math.random() * demoResponses.length)]
+      }]);
+      setIsLoading(false);
+      return;
+    }
+
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
       const response = await fetch(`${API_BASE}/chat/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           session_id: chatSessionId || 'new',
-          message: input,
+          message: currentInput,
           diagnostic_context: diagnosticContext
-        })
+        }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json();
@@ -344,14 +466,9 @@ const ChatInterface = ({ diagnosticContext, sessionId, onSessionCreate }) => {
       }
     } catch (error) {
       // Fallback response
-      const responses = [
-        `Based on your diagnostic, here's my recommendation: Your primary persona is struggling with clarity on their path forward. Let me develop a targeted approach...`,
-        `Looking at your competitive positioning, the biggest gap I see is in personalized implementation support. Here's how to exploit that...`,
-        `For your target market, the emotional trigger that resonates most is the fear of wasting time on strategies that don't work. Let me craft messaging around that...`
-      ];
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: responses[Math.floor(Math.random() * responses.length)]
+        content: demoResponses[Math.floor(Math.random() * demoResponses.length)]
       }]);
     }
 
@@ -378,7 +495,7 @@ const ChatInterface = ({ diagnosticContext, sessionId, onSessionCreate }) => {
           letterSpacing: '0.1em',
           margin: 0
         }}>
-          Strategy Chat
+          Strategy Chat {isDemoMode && '(Demo)'}
         </h3>
       </div>
 
@@ -461,7 +578,7 @@ const ChatInterface = ({ diagnosticContext, sessionId, onSessionCreate }) => {
 };
 
 // Pricing Card Component
-const PricingCard = ({ tier, price, period, features, isPopular, onSelect }) => {
+const PricingCard = ({ tier, price, period, features, isPopular, onSelect, isDemoMode }) => {
   return (
     <div style={{
       border: isPopular ? `3px solid ${colors.lime}` : `2px solid ${colors.darkGray}`,
@@ -536,7 +653,7 @@ const PricingCard = ({ tier, price, period, features, isPopular, onSelect }) => 
           cursor: 'pointer'
         }}
       >
-        Get Started
+        {isDemoMode ? 'Try Demo' : 'Get Started'}
       </button>
     </div>
   );
@@ -551,6 +668,9 @@ const App = () => {
   const [jobId, setJobId] = useState(null);
   const [expandedSections, setExpandedSections] = useState({ executive: true });
   const [selectedTier, setSelectedTier] = useState('strategic');
+  const [isDemoMode, setIsDemoMode] = useState(true);
+  const [isCheckingBackend, setIsCheckingBackend] = useState(true);
+  const [toast, setToast] = useState(null);
 
   const phases = [
     'Gathering website intelligence',
@@ -563,6 +683,28 @@ const App = () => {
     'Compiling final report'
   ];
 
+  // Check backend availability on mount
+  useEffect(() => {
+    const checkBackend = async () => {
+      setIsCheckingBackend(true);
+      const available = await checkBackendAvailable();
+      setIsDemoMode(!available);
+      setIsCheckingBackend(false);
+
+      if (!available) {
+        setToast({
+          message: 'Backend not available. Running in demo mode with sample data.',
+          type: 'warning'
+        });
+      }
+    };
+    checkBackend();
+  }, []);
+
+  const showToast = (message, type = 'info') => {
+    setToast({ message, type });
+  };
+
   const handleSelectTier = (tier) => {
     setSelectedTier(tier);
     setView('intake');
@@ -574,13 +716,20 @@ const App = () => {
 
     const poll = async () => {
       if (attempts >= maxAttempts) {
+        showToast('Diagnostic generation timed out. Please try again.', 'error');
         setView('pricing');
-        alert('Diagnostic generation timed out. Please try again.');
         return;
       }
 
       try {
-        const response = await fetch(`${API_BASE}/diagnostic/status/${id}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        const response = await fetch(`${API_BASE}/diagnostic/status/${id}`, {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
         const data = await response.json();
 
         setCurrentPhase(data.current_phase);
@@ -596,8 +745,9 @@ const App = () => {
             followUpPrompts: data.follow_up_prompts
           });
           setView('results');
+          showToast('Diagnostic complete!', 'success');
         } else if (data.status === 'error') {
-          alert(`Error: ${data.error}`);
+          showToast(`Error: ${data.error}`, 'error');
           setView('pricing');
         } else {
           attempts++;
@@ -605,11 +755,98 @@ const App = () => {
         }
       } catch (error) {
         attempts++;
-        setTimeout(poll, 2000);
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 2000);
+        } else {
+          showToast('Lost connection to server. Please try again.', 'error');
+          setView('pricing');
+        }
       }
     };
 
     poll();
+  };
+
+  // Generate demo diagnostic data
+  const generateDemoDiagnostic = async (formData) => {
+    // Simulate processing phases
+    for (let i = 0; i < phases.length; i++) {
+      await new Promise(resolve => setTimeout(resolve, 800));
+      setCurrentPhase(i + 1);
+      setPhaseName(phases[i]);
+    }
+
+    return {
+      businessName: formData.businessName,
+      targetMarket: formData.targetMarket,
+      diagnostic: `# ${formData.businessName} Market Diagnostic
+
+## Executive Summary
+
+${formData.businessName} operates in a market hungry for clarity and implementation support. Your target audience of ${formData.targetMarket} is drowning in information but starving for direction.
+
+The competitive landscape shows most players offering either high-theory consulting or low-touch digital products. The gap is clear: hands-on implementation with systematic methodology. Your biggest opportunity lies in positioning as the "implementation partner" rather than another information source.
+
+## Primary Persona Analysis
+
+**Who They Are:** ${formData.targetMarket}
+
+**Core Struggle:** They have consumed countless courses, books, and podcasts but still feel stuck. The problem isn't lack of information—it's lack of clarity on what to do NEXT.
+
+**Primary Complaint:** Overwhelm from too many options without clear direction
+
+**Ultimate Fear:** Wasting months (or years) on strategies that never produce results
+
+**Dream Outcome:** A clear, personalized roadmap that actually works for their specific situation
+
+## Competitive Landscape
+
+Your market contains three main competitor types:
+
+1. **High-Ticket Consultants** - Offer personalized guidance but at premium prices ($5K-$25K+)
+2. **Digital Course Creators** - Scalable but generic, one-size-fits-all approaches
+3. **Free Content Creators** - Build audiences but monetize through volume, not depth
+
+**The Gap:** No one is offering personalized implementation support at an accessible price point with systematic methodology.
+
+## Top 3 Golden Opportunities
+
+1. **Workshop-Led Community Building**
+   Create intimate group experiences where participants implement alongside peers. This provides the accountability and personalization of consulting at a fraction of the cost.
+
+2. **Productized Service Packages**
+   Develop clear, outcome-focused service tiers with defined deliverables. "In 30 days, you'll have X, Y, Z" beats vague promises every time.
+
+3. **Buyer Psychology Content Strategy**
+   Lead with the pain points and fears identified above. Your content should mirror back their exact thoughts before offering solutions.
+
+## 30-Day Quick Wins
+
+- Create a "diagnostic" lead magnet that helps prospects self-identify their biggest gap
+- Develop 3 case studies showcasing transformation (even beta clients count)
+- Build a simple nurture sequence addressing the top 5 objections
+- Launch a pilot workshop with 10 founding members
+
+## 90-Day Strategic Priorities
+
+- Establish signature methodology with memorable framework name
+- Create testimonial generation system
+- Build referral program with existing clients
+- Develop content calendar around buyer psychology insights
+
+---
+
+*This diagnostic was generated using the MarketSauce PRIME methodology. For AI-powered analysis with live web research, configure your API keys and backend server.*`,
+      executiveSummary: `${formData.businessName} operates in a market hungry for clarity and implementation support. Your target audience of ${formData.targetMarket} is drowning in information but starving for direction. The biggest opportunity lies in positioning as the "implementation partner" rather than another information source.`,
+      primaryComplaint: 'overwhelm from too many options without clear direction',
+      ultimateFear: 'wasting months on strategies that never produce results',
+      marketGap: 'implementation support with personalized guidance',
+      topOpportunities: [
+        'Workshop-led community building for high-touch engagement',
+        'Productized service packages with clear transformation outcomes',
+        'Content strategy leveraging buyer psychology insights'
+      ]
+    };
   };
 
   const handleSubmitIntake = async (formData) => {
@@ -617,7 +854,19 @@ const App = () => {
     setCurrentPhase(0);
     setPhaseName('Initializing');
 
+    // If in demo mode, skip API entirely
+    if (isDemoMode) {
+      const demoData = await generateDemoDiagnostic(formData);
+      setDiagnosticData(demoData);
+      setView('results');
+      showToast('Demo diagnostic complete!', 'success');
+      return;
+    }
+
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
       const response = await fetch(`${API_BASE}/diagnostic/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -631,8 +880,11 @@ const App = () => {
           goals: formData.goals || null,
           context: formData.context || null,
           mode: selectedTier === 'express' ? 'express' : selectedTier === 'prime' ? 'full' : 'strategic'
-        })
+        }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json();
@@ -642,27 +894,11 @@ const App = () => {
         throw new Error('Failed to create diagnostic');
       }
     } catch (error) {
-      // Demo mode fallback
-      for (let i = 0; i < phases.length; i++) {
-        await new Promise(resolve => setTimeout(resolve, 1200));
-        setCurrentPhase(i + 1);
-        setPhaseName(phases[i]);
-      }
-
-      setDiagnosticData({
-        businessName: formData.businessName,
-        targetMarket: formData.targetMarket,
-        diagnostic: `# ${formData.businessName} Market Diagnostic\n\n## Executive Summary\n\n${formData.businessName} operates in a market hungry for clarity and implementation support. Your target audience of ${formData.targetMarket} is drowning in information but starving for direction.\n\nThe competitive landscape shows most players offering either high-theory consulting or low-touch digital products. The gap is clear: hands-on implementation with systematic methodology. Your biggest opportunity lies in positioning as the "implementation partner" rather than another information source.\n\n## Key Findings\n\n**Primary Complaint:** Overwhelm from too many options without clear direction\n\n**Ultimate Fear:** Wasting months on strategies that never produce results\n\n**Market Gap:** Implementation support with personalized guidance\n\n## Top 3 Opportunities\n\n1. Workshop-led community building for high-touch engagement\n2. Productized service packages with clear transformation outcomes\n3. Content strategy leveraging buyer psychology insights`,
-        executiveSummary: `${formData.businessName} operates in a market hungry for clarity and implementation support. Your target audience of ${formData.targetMarket} is drowning in information but starving for direction.`,
-        primaryComplaint: 'overwhelm from too many options without clear direction',
-        ultimateFear: 'wasting months on strategies that never produce results',
-        marketGap: 'implementation support with personalized guidance',
-        topOpportunities: [
-          'Workshop-led community building for high-touch engagement',
-          'Productized service packages with clear transformation outcomes',
-          'Content strategy leveraging buyer psychology insights'
-        ]
-      });
+      // Fallback to demo mode
+      showToast('Could not reach server. Generating demo diagnostic...', 'warning');
+      setIsDemoMode(true);
+      const demoData = await generateDemoDiagnostic(formData);
+      setDiagnosticData(demoData);
       setView('results');
     }
   };
@@ -671,7 +907,10 @@ const App = () => {
     if (!diagnosticData) return;
 
     try {
-      if (type === 'report') {
+      if (type === 'report' && !isDemoMode) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+
         const response = await fetch(`${API_BASE}/documents/generate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -679,8 +918,11 @@ const App = () => {
             diagnostic: diagnosticData.diagnostic,
             business_name: diagnosticData.businessName,
             format: 'docx'
-          })
+          }),
+          signal: controller.signal
         });
+
+        clearTimeout(timeoutId);
 
         if (response.ok) {
           const blob = await response.blob();
@@ -690,17 +932,21 @@ const App = () => {
           a.download = `${diagnosticData.businessName.replace(/\s+/g, '_')}_Diagnostic.docx`;
           a.click();
           window.URL.revokeObjectURL(url);
+          showToast('Report downloaded!', 'success');
+          return;
         }
-      } else if (type === 'prompt') {
-        const content = diagnosticData.systemPrompt || diagnosticData.diagnostic;
-        const blob = new Blob([content], { type: 'text/markdown' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${diagnosticData.businessName.replace(/\s+/g, '_')}_System_Prompt.md`;
-        a.click();
-        window.URL.revokeObjectURL(url);
       }
+
+      // Fallback: download as markdown
+      const content = type === 'report' ? diagnosticData.diagnostic : (diagnosticData.systemPrompt || diagnosticData.diagnostic);
+      const blob = new Blob([content], { type: 'text/markdown' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${diagnosticData.businessName.replace(/\s+/g, '_')}_${type === 'report' ? 'Diagnostic' : 'System_Prompt'}.md`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      showToast('File downloaded as Markdown!', 'success');
     } catch (error) {
       // Fallback: download as text
       const content = type === 'report' ? diagnosticData.diagnostic : (diagnosticData.systemPrompt || diagnosticData.diagnostic);
@@ -711,6 +957,7 @@ const App = () => {
       a.download = `${diagnosticData.businessName.replace(/\s+/g, '_')}_${type === 'report' ? 'Diagnostic' : 'System_Prompt'}.md`;
       a.click();
       window.URL.revokeObjectURL(url);
+      showToast('Downloaded as Markdown (server unavailable)', 'warning');
     }
   };
 
@@ -721,12 +968,55 @@ const App = () => {
     }));
   };
 
+  // Show loading state while checking backend
+  if (isCheckingBackend) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        backgroundColor: colors.lightGray,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif"
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '60px',
+            height: '60px',
+            backgroundColor: colors.lime,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontWeight: '700',
+            fontSize: '32px',
+            margin: '0 auto 20px'
+          }}>
+            M
+          </div>
+          <p style={{ color: colors.darkGray, fontSize: '16px' }}>Loading MarketSauce...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{
       minHeight: '100vh',
       backgroundColor: colors.lightGray,
       fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif"
     }}>
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+
+      {/* Demo Mode Banner */}
+      {isDemoMode && <DemoModeBanner />}
+
       {/* Header */}
       <header style={{
         padding: '20px 40px',
@@ -803,6 +1093,16 @@ const App = () => {
                 Deep buyer psychology, competitive analysis, and implementation roadmaps.
                 Submit your business info. Get actionable strategy in minutes.
               </p>
+              {isDemoMode && (
+                <p style={{
+                  fontSize: '14px',
+                  color: colors.warning,
+                  marginTop: '16px',
+                  fontWeight: '600'
+                }}>
+                  Currently in demo mode - try the interface with sample data
+                </p>
+              )}
             </div>
 
             <div style={{
@@ -823,6 +1123,7 @@ const App = () => {
                   'Delivered in under 5 minutes'
                 ]}
                 onSelect={() => handleSelectTier('express')}
+                isDemoMode={isDemoMode}
               />
 
               <PricingCard
@@ -840,6 +1141,7 @@ const App = () => {
                   'Monthly research refresh'
                 ]}
                 onSelect={() => handleSelectTier('strategic')}
+                isDemoMode={isDemoMode}
               />
 
               <PricingCard
@@ -856,6 +1158,7 @@ const App = () => {
                   'Priority processing'
                 ]}
                 onSelect={() => handleSelectTier('prime')}
+                isDemoMode={isDemoMode}
               />
             </div>
           </div>
@@ -878,8 +1181,10 @@ const App = () => {
                 color: colors.darkGray,
                 lineHeight: '1.6'
               }}>
-                The more context you provide, the sharper your diagnostic.
-                We will research your website and competitors automatically.
+                {isDemoMode
+                  ? 'Fill in your details to generate a sample diagnostic. In the full version, we research your website and competitors automatically.'
+                  : 'The more context you provide, the sharper your diagnostic. We will research your website and competitors automatically.'
+                }
               </p>
             </div>
 
@@ -888,7 +1193,7 @@ const App = () => {
               padding: '32px',
               border: `2px solid ${colors.darkGray}`
             }}>
-              <IntakeForm onSubmit={handleSubmitIntake} />
+              <IntakeForm onSubmit={handleSubmitIntake} isDemoMode={isDemoMode} />
             </div>
           </div>
         )}
@@ -903,17 +1208,25 @@ const App = () => {
                 marginBottom: '12px',
                 color: colors.black
               }}>
-                Generating Your Diagnostic
+                {isDemoMode ? 'Generating Demo Diagnostic' : 'Generating Your Diagnostic'}
               </h2>
               <p style={{
                 fontSize: '16px',
                 color: colors.darkGray
               }}>
-                Our AI is researching your market and building your strategic brief.
+                {isDemoMode
+                  ? 'Creating a sample diagnostic based on your inputs...'
+                  : 'Our AI is researching your market and building your strategic brief.'
+                }
               </p>
             </div>
 
-            <ProgressTracker currentPhase={currentPhase} phases={phases} phaseName={phaseName} />
+            <ProgressTracker
+              currentPhase={currentPhase}
+              phases={phases}
+              phaseName={phaseName}
+              isDemoMode={isDemoMode}
+            />
           </div>
         )}
 
@@ -933,7 +1246,10 @@ const App = () => {
                 fontSize: '16px',
                 color: colors.darkGray
               }}>
-                Your market intelligence is ready. Download the full report or continue refining your strategy below.
+                {isDemoMode
+                  ? 'Your demo diagnostic is ready. Download the sample report or explore the strategy chat below.'
+                  : 'Your market intelligence is ready. Download the full report or continue refining your strategy below.'
+                }
               </p>
             </div>
 
@@ -1001,7 +1317,7 @@ const App = () => {
                     letterSpacing: '0.1em',
                     margin: 0
                   }}>
-                    Key Findings
+                    Key Findings {isDemoMode && '(Demo)'}
                   </h3>
                 </div>
 
@@ -1031,6 +1347,7 @@ const App = () => {
 
               <ChatInterface
                 diagnosticContext={diagnosticData.diagnostic}
+                isDemoMode={isDemoMode}
               />
             </div>
           </div>
